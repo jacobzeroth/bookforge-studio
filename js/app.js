@@ -92,6 +92,7 @@
       S.dirty = false;
       setSaveState("saved");
       maybeSnapshot(reason);
+      if (BF.sync && BF.sync.enabled) BF.sync.onBookSaved(S.book);
       return true;
     } catch (e) {
       setSaveState("error", e);
@@ -865,6 +866,7 @@
     if (permanent) {
       S.books = S.books.filter(function (b) { return b.id !== book.id; });
       await BF.storage.deleteBook(book.id);
+      if (BF.sync && BF.sync.enabled) BF.sync.onBookDeleted(book.id);
       if (S.book && S.book.id === book.id) { S.book = null; S.chapterId = null; }
     } else {
       book.trashed = true;
@@ -1036,6 +1038,145 @@
   }
 
   /* --------------------------------------------------------------- settings */
+  /* -------------------------------------------------------------- cloud sync */
+  function syncLabel(s) {
+    if (!s || !s.enabled) return "Sync off";
+    if (s.status === "syncing") return "Syncing…";
+    if (s.status === "error") return "Sync error";
+    if (!s.lastSyncAt) return "Not synced yet";
+    return "Synced " + U.relativeTime(s.lastSyncAt);
+  }
+
+  function renderSyncChip(s) {
+    var chip = refs.syncStatus;
+    if (!chip) return;
+    var label = syncLabel(s);
+    chip.dataset.state = !s.enabled ? "off" : (s.status === "error" ? "error" : s.status === "syncing" ? "syncing" : "on");
+    chip.title = !s.enabled
+      ? "Cloud sync is off — click to connect"
+      : (s.lastError ? "Sync error: " + s.lastError.message : "Cloud sync is on. Click for details.");
+    if (refs.syncText) refs.syncText.textContent = label;
+  }
+
+  function openSyncDialog() {
+    var body = U.el("div", { class: "sync-body" });
+    var actions = [];
+
+    function renderBody() {
+      var s = BF.sync.status();
+      body.innerHTML = "";
+
+      body.appendChild(U.el("div", { class: "sync-state" }, [
+        U.el("span", { class: "sync-state-dot", dataset: { state: s.enabled ? (s.status === "error" ? "error" : "on") : "off" } }),
+        U.el("strong", { text: syncLabel(s) }),
+        s.lastSyncAt ? U.el("span", { class: "muted", text: " · " + U.formatDateTime(s.lastSyncAt) }) : null
+      ]));
+
+      body.appendChild(U.el("p", { class: "small muted", text: "Your books stay in this browser first. When sync is on, each book is also copied to your private cloud slot so your phone and laptop share the same library." }));
+
+      var codeField = U.el("div", { class: "field" }, [
+        U.el("label", { for: "syncCodeInput", text: "Sync code" }),
+        (function () {
+          var input = U.el("input", { id: "syncCodeInput", type: "text", autocomplete: "off", spellcheck: "false", placeholder: "Paste the code from your other device" });
+          input.value = s.code || "";
+          return input;
+        })(),
+        U.el("div", { class: "help", text: "One code connects every device. Treat it like a password — anyone with it can read and change your synced books." })
+      ]);
+      body.appendChild(codeField);
+
+      var serverField = U.el("div", { class: "field" }, [
+        U.el("label", { for: "syncServerInput", text: "Sync server" }),
+        (function () {
+          var input = U.el("input", { id: "syncServerInput", type: "text", autocomplete: "off", spellcheck: "false" });
+          input.value = s.server || BF.sync.DEFAULT_SERVER;
+          return input;
+        })()
+      ]);
+      body.appendChild(serverField);
+
+      var row = U.el("div", { class: "sync-actions" }, [
+        U.el("button", { class: "btn ghost", type: "button", text: s.enabled ? "Disconnect" : "Connect", onclick: async function () {
+          if (s.enabled) {
+            await BF.sync.disable();
+            toast("Cloud sync disconnected on this device");
+            renderBody();
+            return;
+          }
+          var code = body.querySelector("#syncCodeInput").value.trim();
+          var server = body.querySelector("#syncServerInput").value.trim();
+          if (code.length < 16) { toast("Paste a sync code (at least 16 characters) or generate one.", "error"); return; }
+          try {
+            await BF.sync.enable(code, server);
+            toast("Cloud sync connected");
+          } catch (e) {
+            toast("Could not connect: " + e.message, "error");
+          }
+          renderBody();
+        } }),
+        U.el("button", { class: "btn ghost", type: "button", text: "Generate new code", onclick: async function () {
+          var code = BF.sync.newCode();
+          body.querySelector("#syncCodeInput").value = code;
+          try {
+            await BF.sync.enable(code, body.querySelector("#syncServerInput").value.trim());
+            toast("New sync code created — copy it to your other devices");
+          } catch (e) {
+            toast("Could not connect: " + e.message, "error");
+          }
+          renderBody();
+        } }),
+        U.el("button", { class: "btn ghost", type: "button", text: "Copy code", onclick: function () {
+          var code = body.querySelector("#syncCodeInput").value.trim();
+          if (!code) { toast("No code to copy yet", "error"); return; }
+          (navigator.clipboard ? navigator.clipboard.writeText(code) : Promise.reject(new Error("Clipboard unavailable")))
+            .then(function () { toast("Sync code copied"); })
+            .catch(function () { toast("Select the code and copy it manually", "error"); });
+        } }),
+        U.el("button", { class: "btn primary", type: "button", text: "Sync now", onclick: async function () {
+          if (!BF.sync.enabled) { toast("Connect a sync code first", "error"); return; }
+          await BF.sync.syncNow();
+          renderBody();
+        } })
+      ]);
+      body.appendChild(row);
+
+      if (s.lastError) {
+        body.appendChild(U.el("p", { class: "small", style: "color:var(--bad)", text: "Last error: " + s.lastError.message }));
+      }
+      body.appendChild(U.el("p", { class: "small muted", text: "Tip: export a project backup (Export → Project backup) before switching devices for the first time." }));
+    }
+
+    renderBody();
+    actions.push({ label: "Done", primary: true });
+    openDialog({ title: "Cloud sync", wide: true, body: body, actions: actions });
+  }
+
+  async function refreshAfterSync(changedIds, deletedIds) {
+    changedIds = changedIds || [];
+    deletedIds = deletedIds || [];
+    S.books = await BF.storage.loadAllBooks();
+    if (S.book && deletedIds.indexOf(S.book.id) >= 0) {
+      S.book = null;
+      S.chapterId = null;
+      setView("dashboard");
+      toast("A book you had open was deleted on another device");
+      return;
+    }
+    if (S.book) {
+      var fresh = S.books.filter(function (b) { return b.id === S.book.id; })[0];
+      if (fresh && changedIds.indexOf(S.book.id) >= 0 && !S.dirty) {
+        S.book = fresh;
+        if (!S.book.chapters.some(function (c) { return c.id === S.chapterId; })) {
+          S.chapterId = S.book.chapters.length ? S.book.chapters[0].id : null;
+        }
+      } else if (fresh) {
+        S.book = fresh;
+      }
+    }
+    render();
+    if (changedIds.length) toast("Updated from another device");
+  }
+
   async function openSettings() {
     var b = S.book;
     var g = BF.globalSettings || {};
@@ -1051,8 +1192,17 @@
         { name: "paragraphSpacing", label: "Paragraph spacing (em)", type: "number", value: g.paragraphSpacing || 0.9 },
         { name: "columnWidth", label: "Writing column width (px)", type: "number", value: g.columnWidth || 760 },
         { name: "citationStyle", label: "Citation style", type: "select", value: b ? (b.settings.citationStyle || "apa") : "apa", options: BF.model.CITATION_STYLES.map(function (s) { return { value: s.id, label: s.name }; }) },
-        { name: "autosaveMs", label: "Autosave delay (ms)", type: "number", value: g.autosaveMs || 900, help: "Saves are written to IndexedDB; Google Drive–style cloud sync is not part of this local edition." },
+        { name: "autosaveMs", label: "Autosave delay (ms)", type: "number", value: g.autosaveMs || 900, help: "Saves are written to IndexedDB immediately, then pushed to the cloud when sync is connected." },
         { name: "aiEndpoint", label: "AI endpoint URL (optional)", type: "text", value: g.aiEndpoint || "", help: "Your own server URL that proxies the AI provider. API keys stay on the server." }
+      ],
+      extraActions: [
+        {
+          label: "Cloud sync…",
+          onClick: function (close) {
+            if (close) close();
+            setTimeout(openSyncDialog, 60);
+          }
+        }
       ],
       submitLabel: "Save settings",
       onSubmit: function (values) {
@@ -1532,6 +1682,7 @@
       saveNow("export").then(function () { BF.layout.print(S.book); });
     });
     refs.btnSettings.addEventListener("click", openSettings);
+    if (refs.syncStatus) refs.syncStatus.addEventListener("click", openSyncDialog);
     refs.btnProfile.addEventListener("click", function () {
       var b = S.book;
       if (!b) { toast("Open a book to edit the author profile."); return; }
@@ -1645,6 +1796,11 @@
       var meta = await BF.storage.loadMeta();
       BF.globalSettings = meta.globalSettings || {};
       S.books = await BF.storage.loadAllBooks();
+      if (BF.sync) {
+        BF.sync.onChange = renderSyncChip;
+        BF.sync.init(meta);
+        renderSyncChip(BF.sync.status());
+      }
       S.sidebarCollapsed = !!meta.sidebarCollapsed;
       refs.workspace.classList.toggle("sidebar-collapsed", S.sidebarCollapsed);
       refs.btnSidebar.setAttribute("aria-expanded", String(!S.sidebarCollapsed));
@@ -1674,6 +1830,8 @@
       topBookSub: $("#topBookSub"),
       saveStatus: $("#saveStatus"),
       saveText: $("#saveText"),
+      syncStatus: $("#syncStatus"),
+      syncText: $("#syncText"),
       btnSidebar: $("#btnSidebar"),
       btnUndo: $("#btnUndo"),
       btnRedo: $("#btnRedo"),
@@ -1726,7 +1884,8 @@
     insertImageFile: insertImageFile, insertImageUrl: insertImageUrl, insertSpecialChar: insertSpecialChar,
     addAsset: addAsset, editAsset: editAsset, editInlineImage: editInlineImage, replaceInlineImage: replaceInlineImage,
     showShortcuts: showShortcuts,
-    applyTheme: applyTheme, applyTypography: applyTypography
+    applyTheme: applyTheme, applyTypography: applyTypography,
+    refreshAfterSync: refreshAfterSync, openSyncDialog: openSyncDialog
   };
 
   document.addEventListener("DOMContentLoaded", boot);

@@ -178,6 +178,22 @@ input[type="range"] { accent-color: var(--accent); }
 @keyframes pulse { 50% { opacity: .35; } }
 @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
 
+/* ------------------------------------------------------------- cloud sync */
+.sync-status { font: inherit; font-size: 12px; background: none; cursor: pointer; }
+.sync-status:hover { border-color: var(--accent); color: var(--text); }
+.sync-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--muted); }
+.sync-status[data-state="on"] .sync-dot { background: var(--good); }
+.sync-status[data-state="syncing"] .sync-dot { background: var(--accent); animation: pulse 1.1s ease-in-out infinite; }
+.sync-status[data-state="error"] .sync-dot { background: var(--bad); }
+.sync-status[data-state="error"] { color: var(--bad); border-color: var(--bad); }
+.sync-body .sync-state { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; font-size: 13px; }
+.sync-state-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--muted); }
+.sync-state-dot[data-state="on"] { background: var(--good); }
+.sync-state-dot[data-state="error"] { background: var(--bad); }
+.sync-actions { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0 6px; }
+.sync-body .field input { font-family: var(--mono, ui-monospace, monospace); font-size: 12px; }
+@media (max-width: 720px) { .sync-status { display: none; } }
+
 /* ------------------------------------------------------------- workspace */
 .workspace {
   display: grid; grid-template-columns: var(--sidebar-w) minmax(0, 1fr) var(--context-w);

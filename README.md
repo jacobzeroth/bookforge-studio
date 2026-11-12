@@ -5,8 +5,9 @@ book, write in a real rich-text manuscript editor, keep research and references,
 produce paginated print proofs, run editorial checks and export genuine DOCX, EPUB 3,
 HTML, Markdown, TXT and JSON files.
 
-Nothing is stored in the cloud. Books live in your browser's IndexedDB (with a
-localStorage or in-memory fallback), and exports are generated on your machine.
+Nothing is stored in the cloud unless you turn sync on. Books live in your browser's
+IndexedDB (with a localStorage or in-memory fallback), exports are generated on your
+machine, and the optional sync service only ever sees the books you explicitly sync.
 
 ---
 
@@ -149,6 +150,19 @@ an endpoint **you** configure in Settings; there is no bundled key or model.
 - Export/import round-trips through `.bookforge.json`; imported books are normalised
   and validated (no manuscript → explicit error, never silent data loss).
 
+### Cloud sync (optional)
+
+- Off by default. Nothing is uploaded until you paste or generate a sync code.
+- Click the **Sync off / Synced** chip in the top bar (or Settings → Cloud sync) to
+  connect a device. The same code on your phone and laptop gives both the same library.
+- The service is a small Cloudflare Worker (`bookforge-sync`): a D1 table holds the
+  index, KV holds book bodies. Requests carry the sync code as a bearer token; the
+  server stores only its SHA-256 hash, never the code itself.
+- Every book carries `updatedAt`. Sync is last-write-wins per book, deletions are
+  written as tombstones so they propagate, and local storage is always written first.
+- Automatic sync runs on save (debounced), every 60 s while the tab is visible, on
+  reconnect and when the tab regains focus.
+
 ---
 
 ## Honest limitations
@@ -161,8 +175,11 @@ an endpoint **you** configure in Settings; there is no bundled key or model.
   OOXML, not a renamed HTML file.
 - **EPUB** is a valid EPUB 3 package by construction, but it is not run through
   `epubcheck` in the browser. Validate with epubcheck before commercial distribution.
-- **No collaboration, accounts or cloud sync.** All books stay in this browser's
-  storage. Clearing site data removes them unless you exported a backup.
+- **Cloud sync is optional and last-write-wins.** Books always live in this browser's
+  storage first. If you connect a sync code, each book is also copied to the sync
+  service so your devices share a library; conflicts resolve by the newest edit and
+  deletions propagate as tombstones. Without a sync code nothing leaves the browser,
+  and clearing site data still removes local copies unless you exported a backup.
 - **AI assistance is opt-in and off by default.** There is no bundled model or key.
   The AI panel includes a **Correct grammar & punctuation** action for a configured
   endpoint; suggestions are always shown separately and are never auto-applied. Facts
@@ -251,9 +268,20 @@ bookforge/
   js/editor.js        contenteditable manuscript engine
   js/image-editor.js  canvas image resize/compress/rotate dialog
   js/text-tools.js    local clean-up and text normalization tools
+  js/sync.js          optional cloud sync (push/pull, last-write-wins)
   js/layout.js        measurement pagination, preview, page proof, print
   js/export.js        DOCX/EPUB/HTML/MD/TXT/JSON + preflight
   js/views.js         all workspace views
   js/app.js           shell, dialogs, commands, keyboard shortcuts, boot
   tests/e2e.mjs       headless-browser acceptance tests
+  build-standalone.mjs  bundles the app into one self-contained HTML file
+```
+
+The optional sync backend lives beside it:
+
+```
+bookforge-sync/
+  src/index.js        Cloudflare Worker (auth, index, bodies)
+  schema.sql          D1 table for the book index
+  wrangler.toml       KV + D1 bindings
 ```

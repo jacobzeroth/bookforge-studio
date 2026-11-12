@@ -145,6 +145,24 @@
     return true;
   }
 
+  /* Writes a book exactly as given, without touching updatedAt.
+     Used by cloud sync so a pulled revision keeps the server's timestamp. */
+  async function putBookRaw(book) {
+    if (!book || !book.id) throw new Error("putBookRaw: book.id is required");
+    var payload = U.clone(book);
+    if (state.mode === "indexeddb") return idbTx(state.db, STORES.projects, "readwrite", function (os) { return os.put(payload); });
+    if (state.mode === "localstorage") {
+      var data = lsRead();
+      var idx = data.projects.findIndex(function (b) { return b.id === payload.id; });
+      if (idx >= 0) data.projects[idx] = payload; else data.projects.push(payload);
+      lsWrite(data);
+      return true;
+    }
+    var i = state.memory.projects.findIndex(function (b) { return b.id === payload.id; });
+    if (i >= 0) state.memory.projects[i] = payload; else state.memory.projects.push(payload);
+    return true;
+  }
+
   async function deleteBook(id) {
     if (state.mode === "indexeddb") return idbTx(state.db, STORES.projects, "readwrite", function (os) { return os.delete(id); });
     if (state.mode === "localstorage") {
@@ -315,6 +333,7 @@
     get lastError() { return state.lastError; },
     loadAllBooks: loadAllBooks,
     saveBook: saveBook,
+    putBookRaw: putBookRaw,
     deleteBook: deleteBook,
     listVersions: listVersions,
     getVersion: getVersion,

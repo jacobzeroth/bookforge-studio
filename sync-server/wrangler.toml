@@ -1,0 +1,12 @@
+name = "bookforge-sync"
+main = "src/index.js"
+compatibility_date = "2026-01-01"
+
+[[kv_namespaces]]
+binding = "BOOKS"
+id = "4e3fd9e9e66e45f3a6edf34a198fc097"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "bookforge-sync"
+database_id = "5b9beb5a-dae5-4c90-85c8-ca721a510787"
