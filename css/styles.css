@@ -591,7 +591,7 @@ body.typewriter-scroll .canvas-wrap { scroll-behavior: auto; }
 
 /* ------------------------------------------------------- layout studio */
 .studio-grid { display: grid; grid-template-columns: minmax(260px, 320px) minmax(0, 1fr); gap: 16px; }
-@media (max-width: 980px) { .studio-grid { grid-template-columns: 1fr; } }
+@media (max-width: 980px) { .studio-grid { grid-template-columns: minmax(0, 1fr); } .studio-grid > * { min-width: 0; } }
 .page-preview { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius-lg); padding: 16px; overflow: auto; max-height: 78vh; }
 .page-preview .print-page { margin: 0 auto 18px; box-shadow: var(--shadow); }
 
@@ -725,4 +725,150 @@ kbd {
   background: rgba(255, 255, 255, .08);
   font-family: inherit;
   font-size: 12px;
+}
+
+/* ==========================================================================
+   Phone layout (<= 760px)
+   The desktop shell is a three-column grid (sidebar + manuscript + context).
+   On a phone that grid has no room left for the manuscript, so the shell
+   becomes a single column, navigation moves into an off-canvas drawer and the
+   top bar keeps only the controls you actually use while writing.
+   ========================================================================== */
+.mobile-only { display: none; }
+.nav-backdrop[hidden] { display: none; }
+
+@media (max-width: 900px) {
+  :root { --topbar-h: 52px; --status-h: 34px; }
+  #app {
+    height: 100dvh;
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  /* ------------------------------------------------------------- top bar */
+  .topbar { padding: 0 8px; gap: 6px; }
+  .brand { border-right: 0; padding-right: 0; }
+  .brand-word, .book-id-sub, .mode-select, #btnSearch,
+  #btnPrint, #btnSettings, #btnProfile, .menu-wrap, .sync-status { display: none; }
+  .book-id-title { max-width: 34vw; font-size: 13px; }
+  .save-status { gap: 0; padding: 4px 7px; }
+  .save-status #saveText {
+    position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0;
+    overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+  }
+  .mobile-only { display: inline-grid; }
+  #btnMobileMore { font-size: 19px; line-height: 1; }
+  .icon-btn { min-width: 36px; height: 36px; }
+  .avatar-btn { width: 34px; height: 34px; }
+
+  /* --------------------------------------------------- workspace / drawer */
+  .workspace, .workspace.sidebar-collapsed,
+  .workspace.context-hidden, .workspace.sidebar-collapsed.context-hidden {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .context-panel { display: none; }
+  body.nav-open { overflow: hidden; }
+
+  .sidebar {
+    position: fixed; z-index: 55; top: calc(var(--topbar-h) + env(safe-area-inset-top)); bottom: 0; left: 0;
+    width: min(84vw, 330px);
+    transform: translateX(-102%);
+    transition: transform .22s ease;
+    box-shadow: 0 24px 60px rgba(0, 0, 0, .55);
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  body.nav-open .sidebar { transform: none; }
+  .nav-backdrop {
+    position: fixed; inset: 0; z-index: 50;
+    background: rgba(4, 5, 7, .62);
+  }
+  .nav { padding: 8px; }
+  .nav button { padding: 12px; font-size: 15px; gap: 12px; border-radius: 10px; }
+  .nav .nav-ico { width: 20px; flex-basis: 20px; }
+  .nav-group { padding: 14px 12px 6px; }
+  .new-book-btn { padding: 12px; font-size: 15px; }
+  /* a stored desktop "collapsed" state must not hide labels on a phone */
+  .sidebar-collapsed .nav button span:not(.nav-ico),
+  .sidebar-collapsed .nav-group,
+  .sidebar-collapsed .sidebar-foot .local-note { display: initial; }
+  .sidebar-collapsed .nav button { justify-content: flex-start; padding: 12px; }
+
+  /* ---------------------------------------------------------- main content */
+  #view { padding: 14px 12px calc(56px + env(safe-area-inset-bottom)); }
+  .view-head { margin-bottom: 12px; gap: 10px; }
+  .view-head h1 { font-size: 21px; }
+  .view-actions { width: 100%; }
+  .view-actions .btn { flex: 1 1 auto; min-height: 40px; }
+  .panel-block { padding: 12px; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .panel-title { font-size: 11px; }
+  .table { font-size: 12.5px; min-width: 520px; }
+  .template-grid { grid-template-columns: 1fr; }
+  .empty { padding: 26px 16px; }
+
+  /* ----------------------------------------------------------- status bar */
+  .statusbar { padding: 0 10px; font-size: 11px; gap: 8px; }
+  #stChars, #stRead, #stTarget, #stPage, .zoom, #stZoom,
+  .statusbar label[for="zoomRange"] { display: none; }
+  .status-left, .status-right { gap: 8px; overflow: hidden; }
+  .statusbar .sep { display: none; }
+  #stChapter { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 46vw; }
+
+  /* ------------------------------------------------------------- manuscript */
+  /* The shell is a grid; without an explicit track the nowrap toolbar's
+     max-content width would stretch the whole editor past the phone. */
+  .editor-shell { grid-template-columns: minmax(0, 1fr); }
+  .editor-shell > * { min-width: 0; max-width: 100%; }
+  .editor-toolbar {
+    flex-wrap: nowrap; overflow-x: auto; overflow-y: hidden;
+    -webkit-overflow-scrolling: touch; scrollbar-width: none;
+    padding: 6px; gap: 2px; border-radius: 12px 12px 0 0;
+  }
+  .editor-toolbar::-webkit-scrollbar { display: none; }
+  .editor-toolbar .group { flex: 0 0 auto; padding: 0 4px; }
+  .editor-toolbar button { min-width: 36px; height: 36px; font-size: 14px; }
+  .editor-toolbar select { height: 36px; font-size: 13px; }
+  .canvas-wrap { padding: 10px 10px 70px; border-radius: 0 0 12px 12px; min-height: 50vh; max-width: 100%; overflow-x: auto; }
+  .page-sheet { padding: 20px 18px 40px; border-radius: 6px; }
+  .manuscript { font-size: max(16px, var(--manuscript-size, 17px)); max-width: 100%; overflow-wrap: break-word; }
+  .manuscript-bar { gap: 6px; padding: 6px 8px; }
+  .manuscript-bar .bar-meta { display: none; }
+  .manuscript-bar .bar-actions { width: 100%; margin-left: 0; gap: 6px; }
+  .manuscript-bar .bar-actions .btn,
+  .manuscript-bar .bar-actions button { flex: 1 1 auto; min-height: 36px; }
+  .seg button { min-height: 36px; }
+  .canvas-wrap.is-pages { padding: 12px 8px 60px; }
+  .page-card-head { font-size: 11px; }
+  .page-card-actions { width: 100%; }
+
+  /* ------------------------------------------------------- dialogs as sheets */
+  .overlay { padding: 0; place-items: stretch; }
+  .dialog, .dialog.wide, .dialog.narrow {
+    width: 100%; max-width: 100%;
+    height: 100dvh; max-height: 100dvh;
+    border-radius: 0; border: 0;
+  }
+  .dialog-head { padding: 12px 14px; padding-top: calc(12px + env(safe-area-inset-top)); }
+  .dialog-head h2 { font-size: 16px; }
+  .dialog-body { padding: 14px; }
+  .dialog-foot { padding: 10px 14px calc(12px + env(safe-area-inset-bottom)); }
+  .dialog-foot .btn { flex: 1 1 40%; min-height: 44px; }
+  .field input, .field select, .field textarea { min-height: 44px; font-size: 16px; }
+  .sync-body .field input { font-size: 16px; }
+  .sync-actions .btn { flex: 1 1 46%; min-height: 42px; }
+  .wizard-steps span { font-size: 10px; padding: 6px 2px; }
+
+  /* --------------------------------------------------------------- misc */
+  .menu { min-width: 240px; max-width: calc(100vw - 16px); max-height: 70vh; overflow-y: auto; padding: 6px; }
+  .menu button { min-height: 44px; padding: 10px 12px; font-size: 15px; }
+  .menu hr { margin: 6px 2px; }
+  .toast { bottom: calc(64px + env(safe-area-inset-bottom)); max-width: 92vw; }
+  .context-menu, .insert-menu { max-height: 70vh; overflow-y: auto; }
+}
+
+@media (max-width: 400px) {
+  .brand-mark { display: none; }
+  .book-id-title { max-width: 40vw; }
+  .grid.cols-4, .grid.cols-3 { grid-template-columns: 1fr; }
+  .stat .v { font-size: 22px; }
+  #view { padding-left: 10px; padding-right: 10px; }
 }

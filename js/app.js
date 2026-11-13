@@ -307,6 +307,24 @@
       menu.appendChild(U.el("button", { text: it.label, onclick: function () { document.body.removeChild(menu); it.onClick(); } }));
     });
     document.body.appendChild(menu);
+    // Keep the menu inside the viewport (phones open it from the top-right corner).
+    // Near the right edge we anchor with `right`, so a late font/reflow change
+    // cannot push the menu off-screen.
+    menu.style.top = y + "px";
+    var firstWidth = menu.getBoundingClientRect().width || 240;
+    if (x + firstWidth > window.innerWidth - 8) {
+      menu.style.right = "8px";
+      menu.style.left = "auto";
+    } else {
+      menu.style.left = Math.max(8, x) + "px";
+    }
+    function clampMenu() {
+      var rect = menu.getBoundingClientRect();
+      var top = Math.max(8, Math.min(parseFloat(menu.style.top) || 0, window.innerHeight - rect.height - 8));
+      menu.style.top = top + "px";
+    }
+    clampMenu();
+    requestAnimationFrame(clampMenu);
     setTimeout(function () {
       document.addEventListener("mousedown", function close(ev) {
         if (!menu.contains(ev.target)) { menu.remove(); document.removeEventListener("mousedown", close); }
@@ -1668,6 +1686,7 @@
   /* ------------------------------------------------------------------ wiring */
   function bindTopbar() {
     refs.btnSidebar.addEventListener("click", function () {
+      if (BF.mobile && BF.mobile.isMobile()) { BF.mobile.toggleNav(); return; }
       S.sidebarCollapsed = !S.sidebarCollapsed;
       refs.workspace.classList.toggle("sidebar-collapsed", S.sidebarCollapsed);
       refs.btnSidebar.setAttribute("aria-expanded", String(!S.sidebarCollapsed));
@@ -1854,6 +1873,7 @@
     };
     renderNav();
     await loadData();
+    if (BF.mobile) BF.mobile.init();
     bindTopbar();
     bindStatusbar();
     document.getElementById("btnNewBookSide").addEventListener("click", newBookWizard);

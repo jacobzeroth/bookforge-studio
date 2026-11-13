@@ -1624,7 +1624,9 @@
       var box = document.getElementById("designPreview");
       var warn = document.getElementById("designWarnings");
       if (!box) return;
-      var scale = Math.min(1, (box.clientWidth - 12) / (BF.model.trimOf(b.design).w * (96 / 25.4)));
+      // clientWidth still counts padding/border, and a vertical scrollbar can
+      // appear after this measurement, so leave room for both.
+      var scale = Math.min(1, (box.clientWidth - 52) / (BF.model.trimOf(b.design).w * (96 / 25.4)));
       var res = BF.layout.renderPreview(box, b, scale);
       if (warn) warn.textContent = res.pages.length + " pages at " + BF.model.trimOf(b.design).w + " × " + BF.model.trimOf(b.design).h + " mm" + (res.warnings.length ? " · " + res.warnings.length + " layout warning(s): " + res.warnings.slice(0, 2).join(" ") : "");
     }

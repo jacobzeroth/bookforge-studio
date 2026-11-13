@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>BookForge phone preview harness</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #14161a; }
+  body { display: flex; align-items: center; justify-content: center; gap: 24px; }
+  .device { position: relative; border-radius: 26px; overflow: hidden; box-shadow: 0 20px 60px rgba(0,0,0,.6); background: #000; }
+  iframe { display: block; border: 0; background: #000; }
+  .label { position: absolute; top: 8px; left: 12px; color: #fff; font: 11px ui-monospace, monospace; opacity: .55; pointer-events: none; }
+</style>
+</head>
+<body>
+<div class="device" id="device">
+  <iframe id="phone" title="BookForge phone preview"></iframe>
+</div>
+<script>
+  var q = new URLSearchParams(location.search);
+  var w = Number(q.get("w")) || 390;
+  var h = Number(q.get("h")) || 844;
+  var frame = document.getElementById("phone");
+  frame.style.width = w + "px";
+  frame.style.height = h + "px";
+  document.getElementById("device").style.width = w + "px";
+  document.getElementById("device").style.height = h + "px";
+  frame.src = "/index.html?preview=" + w;
+</script>
+</body>
+</html>

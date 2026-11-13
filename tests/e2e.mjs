@@ -943,6 +943,126 @@ try {
     await c.send("Emulation.clearDeviceMetricsOverride");
   });
 
+  await test("mobile: phone layout fits, drawer and menu work, dialogs are sheets", async () => {
+    await c.send("Emulation.setDeviceMetricsOverride", { width: 390, height: 844, deviceScaleFactor: 3, mobile: true });
+    await reload();
+    await sleep(300);
+
+    const layout = await c.evaluate(`(() => {
+      const d = document;
+      const ws = document.getElementById("workspace");
+      const r = (sel) => { const e = d.querySelector(sel); if (!e) return null; const b = e.getBoundingClientRect(); return { x: b.x, y: b.y, w: b.width, h: b.height, right: b.right }; };
+      return {
+        iw: innerWidth,
+        ih: innerHeight,
+        docSW: d.documentElement.scrollWidth,
+        clientW: d.documentElement.clientWidth,
+        tracks: getComputedStyle(ws).gridTemplateColumns.split(" ").length,
+        context: getComputedStyle(d.querySelector(".context-panel")).display,
+        settings: getComputedStyle(document.getElementById("btnSettings")).display,
+        more: r("#btnMobileMore"),
+        sidebar: r(".sidebar"),
+        isMobile: BF.mobile.isMobile()
+      };
+    })()`);
+    assertEq(layout.isMobile, true, "BF.mobile should detect the phone viewport");
+    assert(layout.docSW <= layout.clientW, "phone layout overflows horizontally: " + layout.docSW + " > " + layout.clientW);
+    assertEq(layout.tracks, 1, "workspace should collapse to a single column on a phone");
+    assertEq(layout.context, "none", "context panel should be hidden on a phone");
+    assertEq(layout.settings, "none", "desktop top-bar settings should be hidden on a phone");
+    assert(layout.more && layout.more.w >= 36, "the more menu button should be visible on a phone");
+    assert(layout.sidebar.right <= 1, "sidebar should start off-canvas on a phone");
+
+    const drawer = await c.evaluate(`(async () => {
+      const d = document;
+      const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+      d.getElementById("btnSidebar").click();
+      await sleep(340);
+      const sb = d.querySelector(".sidebar").getBoundingClientRect();
+      const bd = d.getElementById("navBackdrop");
+      const open = d.body.classList.contains("nav-open");
+      const backdrop = !bd.hidden && bd.getBoundingClientRect().width > 0;
+      const first = [...d.querySelectorAll("#nav button")][0].getBoundingClientRect().height;
+      bd.click();
+      await sleep(340);
+      return { open, sbX: sb.x, sbW: sb.width, backdrop, first, closed: !d.body.classList.contains("nav-open"), closedX: d.querySelector(".sidebar").getBoundingClientRect().x };
+    })()`);
+    assert(drawer.open, "hamburger should open the navigation drawer");
+    assert(drawer.sbX >= 0 && drawer.sbX + drawer.sbW <= 391, "open drawer should be inside the viewport");
+    assert(drawer.backdrop, "drawer should show a backdrop");
+    assert(drawer.first >= 44, "drawer nav rows should be touch sized, got " + drawer.first);
+    assert(drawer.closed && drawer.closedX < 0, "backdrop tap should close the drawer");
+
+    const menu = await c.evaluate(`(async () => {
+      const d = document;
+      const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+      d.getElementById("btnMobileMore").click();
+      await sleep(180);
+      const menus = [...d.body.children].filter((e) => e.classList && e.classList.contains("menu"));
+      const m = menus[menus.length - 1];
+      const b = m.getBoundingClientRect();
+      const item = m.querySelector("button").getBoundingClientRect().height;
+      const items = m.querySelectorAll("button").length;
+      m.remove();
+      return { left: b.left, right: b.right, top: b.top, bottom: b.bottom, items, item, iw: innerWidth, ih: innerHeight };
+    })()`);
+    assert(menu.items >= 3, "the more menu should list actions");
+    assert(menu.left >= 0 && menu.right <= menu.iw && menu.top >= 0 && menu.bottom <= menu.ih,
+      "more menu must stay inside the viewport: " + JSON.stringify(menu));
+    assert(menu.item >= 44, "menu rows should be touch sized, got " + menu.item);
+
+    const sheet = await c.evaluate(`(async () => {
+      const d = document;
+      const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+      BF.app.openSettings();
+      await sleep(300);
+      const dlg = d.querySelector("#overlay .dialog");
+      const b = dlg.getBoundingClientRect();
+      const input = d.querySelector("#overlay .field input");
+      const foot = d.querySelector("#overlay .dialog-foot");
+      const res = {
+        w: b.width, h: b.height, iw: innerWidth, ih: innerHeight,
+        fs: input ? getComputedStyle(input).fontSize : null,
+        inputH: input ? input.getBoundingClientRect().height : null,
+        footBottom: foot ? foot.getBoundingClientRect().bottom : null,
+        scrolls: (() => { const body = d.querySelector("#overlay .dialog-body"); return body.scrollHeight >= body.clientHeight; })()
+      };
+      const ov = d.getElementById("overlay");
+      ov.hidden = true; ov.innerHTML = "";
+      return res;
+    })()`);
+    assert(sheet.w >= sheet.iw - 2 && sheet.h >= sheet.ih - 2, "phone dialog should fill the screen: " + JSON.stringify(sheet));
+    assertEq(sheet.fs, "16px", "phone inputs should use 16px to avoid iOS zoom");
+    assert(sheet.inputH >= 44, "phone inputs should be touch sized, got " + sheet.inputH);
+    assert(sheet.footBottom <= sheet.ih + 1, "dialog footer should stay inside the screen");
+
+    const manuscript = await c.evaluate(`(async () => {
+      const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+      BF.app.setView("manuscript");
+      await sleep(900);
+      const r = (sel) => { const e = document.querySelector(sel); return e ? e.getBoundingClientRect() : null; };
+      const tb = r(".editor-toolbar"), cv = r(".canvas-wrap"), mn = r(".manuscript");
+      return { iw: innerWidth, docSW: document.documentElement.scrollWidth, tbW: tb && tb.width, cvW: cv && cv.width, mnW: mn && mn.width, tbScrolls: (() => { const e = document.querySelector(".editor-toolbar"); return e ? e.scrollWidth > e.clientWidth : false; })() };
+    })()`);
+    assert(manuscript.docSW <= manuscript.iw, "manuscript overflows the phone: " + manuscript.docSW + " > " + manuscript.iw);
+    assert(manuscript.tbW <= manuscript.iw + 1, "editor toolbar is wider than the phone");
+    assert(manuscript.cvW <= manuscript.iw + 1, "editor canvas is wider than the phone");
+    assert(manuscript.mnW <= manuscript.iw + 1, "manuscript text column is wider than the phone");
+    assert(manuscript.tbScrolls, "the editor toolbar should scroll horizontally instead of wrapping");
+
+    await c.send("Emulation.setDeviceMetricsOverride", { width: 1440, height: 1000, deviceScaleFactor: 1, mobile: false });
+    await reload();
+    await sleep(300);
+    const desktop = await c.evaluate(`(() => ({
+      sidebarX: document.querySelector(".sidebar").getBoundingClientRect().x,
+      context: getComputedStyle(document.querySelector(".context-panel")).display,
+      isMobile: BF.mobile.isMobile()
+    }))()`);
+    assertEq(desktop.isMobile, false, "desktop width should leave phone mode");
+    assert(desktop.sidebarX >= 0, "desktop sidebar should be visible again");
+    assert(desktop.context !== "none", "desktop context panel should be visible again");
+  });
+
   await test("clean-up: local corrections preview, save a safety version and apply", async () => {
     const seed = await c.evaluate(`(async () => {
       const b = BF.app.S.book;

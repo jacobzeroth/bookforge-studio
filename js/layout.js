@@ -583,14 +583,32 @@
   function renderPreview(container, book, scale) {
     container.innerHTML = "";
     var res = paginate(book);
+    var s = Number(scale) || 1;
     res.pages.forEach(function (page) {
       var node = pageElement(page, book, res.geo);
-      if (scale && scale !== 1) {
-        node.style.transform = "scale(" + scale + ")";
-        node.style.transformOrigin = "top center";
-        node.style.marginBottom = (res.geo.trimH * scale - res.geo.trimH) + "mm";
+      if (s !== 1) {
+        // A CSS transform does not change layout size, so a scaled page still
+        // forces its full trim width on the container. Wrap it in a box with the
+        // scaled dimensions so the preview fits narrow screens instead of being
+        // cropped and needing horizontal panning.
+        var holder = document.createElement("div");
+        holder.className = "preview-scale";
+        holder.style.width = (res.geo.trimW * s) + "mm";
+        holder.style.height = (res.geo.trimH * s) + "mm";
+        holder.style.position = "relative";
+        holder.style.overflow = "hidden";
+        holder.style.margin = "0 auto 18px";
+        node.style.position = "absolute";
+        node.style.left = "0";
+        node.style.top = "0";
+        node.style.margin = "0";
+        node.style.transform = "scale(" + s + ")";
+        node.style.transformOrigin = "top left";
+        holder.appendChild(node);
+        container.appendChild(holder);
+      } else {
+        container.appendChild(node);
       }
-      container.appendChild(node);
     });
     return res;
   }
