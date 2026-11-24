@@ -943,9 +943,12 @@ kbd {
 }
 
 @media (max-width: 400px) {
-  .brand-svg { display: none; }
   .book-id-title { max-width: 40vw; }
   .grid.cols-4, .grid.cols-3 { grid-template-columns: 1fr; }
   .stat .v { font-size: 22px; }
   #view { padding-left: 10px; padding-right: 10px; }
+}
+
+@media (max-width: 360px) {
+  .brand-svg { display: none; }
 }

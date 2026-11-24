@@ -1,3 +1,5 @@
+<p align="center"><img src="assets/mark.svg" width="96" height="96" alt="BookForge Studio"></p>
+
 # BookForge Studio
 
 A local-first, professional book writing, editing and production workspace. Plan the
