@@ -34,6 +34,31 @@
   }
 
   /* =============================================================== dashboard */
+  var SVG_NS = "http://www.w3.org/2000/svg";
+
+  function brandMark(cls) {
+    var svg = document.createElementNS(SVG_NS, "svg");
+    svg.setAttribute("class", cls || "brand-hero-mark");
+    svg.setAttribute("aria-hidden", "true");
+    svg.setAttribute("focusable", "false");
+    var use = document.createElementNS(SVG_NS, "use");
+    use.setAttribute("href", "#bf-mark");
+    svg.appendChild(use);
+    return svg;
+  }
+
+  function brandHero(actions) {
+    return U.el("div", { class: "brand-hero" }, [
+      brandMark("brand-hero-mark"),
+      U.el("div", { class: "brand-hero-copy" }, [
+        U.el("h1", { class: "brand-hero-word", text: "BookForge" }),
+        U.el("div", { class: "brand-hero-studio", text: "Studio" }),
+        U.el("p", { class: "brand-hero-tag", text: "Write • Edit • Publish • Inspire" })
+      ]),
+      U.el("div", { class: "brand-hero-actions" }, actions)
+    ]);
+  }
+
   function dashboard() {
     A();
     var wrap = U.el("div");
@@ -42,7 +67,7 @@
     var totalChapters = active.reduce(function (sum, b) { return sum + b.chapters.length; }, 0);
     var openComments = active.reduce(function (sum, b) { return sum + (b.comments || []).filter(function (c) { return c.status !== "resolved"; }).length; }, 0);
 
-    wrap.appendChild(viewHead("Dashboard", "Your local-first writing workspace.", [
+    wrap.appendChild(brandHero([
       btn("Create book", function () { A().newBookWizard(); }, "primary"),
       btn("Import project backup", function () { A().importProject(); })
     ]));
@@ -56,6 +81,7 @@
 
     if (!active.length) {
       wrap.appendChild(U.el("div", { class: "empty" }, [
+        brandMark("empty-mark"),
         U.el("h3", { text: "Start your first book" }),
         U.el("p", { text: "BookForge keeps everything in this browser. Choose a template, enter your book details and begin writing — or import an existing .bookforge.json backup." }),
         btn("Create a new book", function () { A().newBookWizard(); }, "primary"),

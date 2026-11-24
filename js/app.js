@@ -132,6 +132,9 @@
   /* ------------------------------------------------------------------ theme */
   function applyTheme(theme) {
     document.documentElement.setAttribute("data-theme", theme);
+    // Keep the phone status bar / browser chrome on-brand too.
+    var chrome = document.querySelector('meta[name="theme-color"]');
+    if (chrome) chrome.setAttribute("content", theme === "light" ? "#f8f6f0" : "#1a1a1a");
     if (S.book) {
       S.book.settings.theme = theme;
       S.book.design = S.book.design || {};

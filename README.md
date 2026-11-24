@@ -254,12 +254,25 @@ error or uncaught exception.
 
 ---
 
+## Brand
+
+The interface follows the BookForge identity: **Royal Gold `#D4AF37`**, **Ivory Cream
+`#F8F6F0`**, **Charcoal `#1A1A1A`** and **Slate Gray `#6B7280`**, with Playfair
+Display for headings and Open Sans for interface text.
+
+- `assets/mark.svg` — the open-book + pen-nib mark.
+- `assets/icon.svg` — the rounded app icon used for the favicon.
+- Fonts are embedded into `css/styles.css` as base64 woff2 (latin subset), so the
+  single-file build keeps the brand offline. Regenerate with
+  `node build-fonts.mjs`; the favicon with `node build-icon.mjs`.
+
 ## Project layout
 
 ```
 bookforge/
-  index.html          app shell
+  index.html          app shell, brand sprite and mark
   server.mjs          zero-dependency static server
+  assets/             brand marks (SVG source of truth)
   css/styles.css      themes, workspace, manuscript, dialogs, print styles
   js/util.js          DOM/format/diff/sanitise helpers
   js/zip.js           CRC-32 STORE zip writer (DOCX/EPUB)
@@ -271,10 +284,14 @@ bookforge/
   js/sync.js          optional cloud sync (push/pull, last-write-wins)
   js/layout.js        measurement pagination, preview, page proof, print
   js/export.js        DOCX/EPUB/HTML/MD/TXT/JSON + preflight
+  js/mobile.js        off-canvas drawer and compact top-bar menu
   js/views.js         all workspace views
   js/app.js           shell, dialogs, commands, keyboard shortcuts, boot
   tests/e2e.mjs       headless-browser acceptance tests
+  tests/mobile-preview.html  phone-viewport harness for manual checks
   build-standalone.mjs  bundles the app into one self-contained HTML file
+  build-fonts.mjs     embeds the brand fonts into css/styles.css
+  build-icon.mjs      embeds the app icon as a data-URI favicon
 ```
 
 The optional sync backend lives beside it:
